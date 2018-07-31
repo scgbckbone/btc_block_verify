@@ -107,7 +107,10 @@ class BTCBlock(dict):
             )
         )
 
-    def verify_block_header(self):
+    def verify_tx_not_empty(self):
+        return isinstance(self.tx, list) and self.tx != []
+
+    def verify_block_hash(self):
         prepared = self.prepare_and_concat_header()
         double_hashed = self.double_sha256(self.unhexlify(prepared))
         return self.swap_endianess(double_hashed) == self.hash
@@ -115,8 +118,19 @@ class BTCBlock(dict):
     def verify_merkleroot(self):
         return self.get_merkle_root(self.tx) == self.merkleroot
 
+    @staticmethod
+    def bits_to_target_int(exponent, coefficient):
+        return coefficient * 2 ** (8 * (exponent - 3))
+
+    def verify_bits_field(self):
+        e, c = int(self.bits[0:2], 16), int(self.bits[2:], 16)
+        target_int = self.bits_to_target_int(e, c)
+        return int(self.hash, 16) < target_int
+
     def verify(self):
         return {
             "merkleroot": self.verify_merkleroot(),
-            "block_hash (block header)": self.verify_block_header()
+            "block_hash (block header)": self.verify_block_hash(),
+            "tx not empty": self.verify_tx_not_empty(),
+            "block satisfies proof-of-work": self.verify_bits_field()
         }
